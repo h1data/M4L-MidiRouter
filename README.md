@@ -22,4 +22,4 @@ Available only when MIDI Input Type has selectable channels.
 Available only when MIDI Output Type has selectable channels or devices.
 
 ## Known Issues
-See [Issues](https://github.com/h1data/M4L-MidiRouter/issues?q=) section.
+see [Issues](https://github.com/h1data/M4L-MidiRouter/issues?q=)
