@@ -15,6 +15,7 @@ https://maxforlive.com/library/device/7509/midi-router
 - `MIDI Input Type` Selects MIDI input type from MIDI tracks or external MIDI devices. Just like 'MIDI From' of MIDI tracks.
 - `MIDI Input Channel` Selects MIDI Input Channel from selected input type above.
 Available only when MIDI Input Type has selectable channels.
+- `Route Here` (![icon image of Route Here button](img/here.png)) When pressed, MIDI Input will be routed to the track which the device belongs if the track is a MIDI track.
 - `Send` Switches if the device route MIDI messages via I/O. M4L devices send MIDI messages even if inactive
 (imagine normal effect devices in MIDI/audio chain), thus let the Send button off if you want to stop sending messages.
 - `MIDI Output Type` Selects MIDI Output type from MIDI tracks or external MIDI devices. Just like 'MIDI To' of MIDI tracks.

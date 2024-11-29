@@ -1,13 +1,13 @@
 /**
  * ioRouting.js
  * 
- * @description manage live.menu to select Audio/MIDI IO routing for Max for Live devices
+ * @description manage live.menu objects to select Audio/MIDI IO routing for Max for Live devices
  * @author h1data
- * @version 1.0.0 / August 7, 2021
+ * @version 1.1.0 January 3, 2022
  * 
- * @arguments js ioRouting.js ioType [channelOffset]
+ * @arguments js ioRoutingLiveMenu.js ioType [channelOffset]
  * @argument {string} ioType midi_inputs, midi_outputs, audio_inputs, or audio_outputs
- * @argument {int} channelOffset (optional) channel number in multiple channel pairs (0 origin)
+ * @argument {int} channelOffset (optional) channel number in multiple channel pairs (zero-based counting)
  */
 
 autowatch = 1;
@@ -18,6 +18,8 @@ var lomTypes = null;
 var lomChannels = null;
 var lomRoutingType = null;
 var lomRoutingChannel = null;
+var lomThisTrack = null;
+var isInitialized = false;
 
 /**
  * Initialize Live API objects.
@@ -31,6 +33,7 @@ function init() {
   var channelOffset = 0;
   if (jsarguments.length >= 3) channelOffset = jsarguments[2];
   var path = 'this_device ' + jsarguments[1] + ' ' + channelOffset;
+  lomThisTrack = new LiveAPI();
   lomTypes = new LiveAPI(callbackTypes, path);
   lomTypes.property = 'available_routing_types';
   lomChannels = new LiveAPI(callbackChannels, path);
@@ -39,6 +42,7 @@ function init() {
   lomRoutingType.property = 'routing_type';
   lomRoutingChannel = new LiveAPI(callbackRoutingChannel, path);
   lomRoutingChannel.property = 'routing_channel';
+  isInitialized = true;
 }
 
 callbackTypes.local = 1;
@@ -54,7 +58,7 @@ function callbackTypes(arg) {
     for (var i=0; i<arg[1].available_routing_types.length; i++) {
         range.push(arg[1].available_routing_types[i].display_name);
     }
-    outlet(0, '_parameter_range', range);
+    outlet(0, '_parameter_range', range); // !!!UNOFFICIAL ATTRIBUTE!!!
   }
 }
 
@@ -99,34 +103,34 @@ function callbackChannels(arg) {
   }
 }
 
-callbackRoutingType.local = 1
+callbackRoutingType.local = 1;
 /**
  * select live.menu's item by current routing type
  * triggered by callback of LiveAPI (routing_type)
  * @param arg dictionary
  * ['id', (int)] or ['routing_type', {'routing_type': {'display_name': (string), 'identifier': (int)}}]
  */
-function callbackRoutingType(arg){
+function callbackRoutingType(arg) {
   if (arg[1].routing_type != undefined) {
     outlet(0, 'setsymbol', arg[1].routing_type.display_name);
   }
 }
 
-callbackRoutingChannel.local = 1
+callbackRoutingChannel.local = 1;
 /**
  * select live.menu's item by current routing channel
  * triggered by callback of LiveAPI (routing_channel)
  * @param {Object} arg dictionary
  * ['id', (int)] or ['routing_channel', {'routing_channel', {'display_name': (string), 'identifier': (int)}}]
  */
-function callbackRoutingChannel(arg){
+function callbackRoutingChannel(arg) {
   if (arg[1].routing_channel != undefined)
     outlet(1, 'setsymbol', arg[1].routing_channel.display_name);
 }
 
 /**
  * change routing type
- * @param {int} id target item number of routing type list (0 origin)
+ * @param {int} id target item number of routing type list (zero-based counting)
  */
 function settype(id) {
   var mapTypes = JSON.parse(lomTypes.get('available_routing_types')).available_routing_types;
@@ -139,7 +143,7 @@ function settype(id) {
 
 /**
  * change routing channel
- * @param {int} id target item number of routing channel list (0 origin)
+ * @param {int} id target item number of routing channel list (zero-based counting)
  */
 function setchannel(id) {
   var mapChannels = lomChannels.get('available_routing_channels');
@@ -148,5 +152,30 @@ function setchannel(id) {
     lomRoutingChannel.set('routing_channel', mapChannels[id]);
   } else {
     error('Invalid Input Channel:', id);
+  }
+}
+
+/**
+ * Automatically route MIDI input to MIDI track where the device belong to.
+ * @param {int} forceRouting 1: force to change routing, not 1: change routing when the input is selected to 'No Input'
+ */
+function routethistrack(forceRouting) {
+  if (!isInitialized || jsarguments[1] != 'midi_inputs') return;
+  var routingType = JSON.parse(lomRoutingType.get('routing_type')).routing_type;
+  var routingTypes = JSON.parse(lomTypes.get('available_routing_types')).available_routing_types;
+  if (forceRouting != 1 && routingType.identifier != routingTypes[routingTypes.length - 1].identifier) return;
+
+  lomThisTrack.goto('this_device');
+  // estimated path: live_set tracks n,live_set return_tracks n, live_set master_track
+  lomThisTrack.goto(lomThisTrack.path.replace('"', '').match(/^.+tracks? \d*/)[0]);
+  if (lomThisTrack.get('has_midi_input') != 1) return;
+  var inputTypes = JSON.parse(lomThisTrack.get('available_input_routing_types')).available_input_routing_types;
+  for (var i=0; i<routingTypes.length; i++) {
+    if (inputTypes[i] == undefined || routingTypes[i].identifier != inputTypes[i].identifier) {
+      if (routingType.identifier == routingTypes[i].identifier) return;
+      lomRoutingType.set('routing_type', routingTypes[i]);
+      setchannel(0);
+      return;
+    }
   }
 }
